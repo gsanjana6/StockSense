@@ -195,7 +195,111 @@ function Login() {
           </button>
 
         </form>
+        <p style={{ marginTop: "15px", fontSize: "0.9rem" }}>
+          Don't have an account?{" "}
+          <span 
+            style={{ color: "var(--ss-primary)", cursor: "pointer", fontWeight: "bold" }} 
+            onClick={() => navigate("/signup")}
+          >
+            Sign up here
+          </span>
+        </p>
 
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   SIGN UP
+========================================================= */
+
+function Signup() {
+  const navigate = useNavigate();
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+
+    setError("");
+    setLoading(true);
+
+    try {
+      // Send registration data to the backend
+      await api.post("/users/register", {
+        name: name,
+        email: email,
+        password: password,
+      });
+
+      // On success, send them to the login page
+      alert("Registration successful! Please log in.");
+      navigate("/login");
+    } catch (err) {
+      console.error(err);
+      setError(
+        getErrorMessage(
+          err,
+          "Registration failed. Please try a different email."
+        )
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-container">
+      <div className="auth-card">
+        <h1>StockSense</h1>
+        <p>Create your account</p>
+
+        <form onSubmit={handleSignup}>
+          <input
+            type="text"
+            placeholder="Full Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+
+          {error && <div className="error-message">{error}</div>}
+
+          <button type="submit" disabled={loading}>
+            {loading ? "Creating account..." : "Sign Up"}
+          </button>
+        </form>
+
+        <p style={{ marginTop: "15px", fontSize: "0.9rem" }}>
+          Already have an account?{" "}
+          <span 
+            style={{ color: "var(--ss-primary)", cursor: "pointer", fontWeight: "bold" }} 
+            onClick={() => navigate("/login")}
+          >
+            Log in here
+          </span>
+        </p>
       </div>
     </div>
   );
@@ -238,6 +342,7 @@ function Dashboard() {
   const [dailySummary, setDailySummary] = useState(null);
   const [geographicExposure, setGeographicExposure] = useState(null);
   const [geographicError, setGeographicError] = useState("");
+  const [companies, setCompanies] = useState({});
 
   const [loadingRecommendations, setLoadingRecommendations] =
     useState(false);
@@ -583,16 +688,8 @@ function Dashboard() {
 
      /* BENCHMARK HISTORY */
       try {
-        const response = await api.get(`/portfolios/${selectedPortfolioId}/performance`, config);
-        const raw = response.data?.performance;
-        // Look for .history from analytics_service
-        const historyData = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.history)
-          ? raw.history
-          : Array.isArray(raw?.series)
-          ? raw.series
-          : [];
+        const response = await api.get(`/portfolios/${selectedPortfolioId}/benchmark-history`, config);
+        const historyData = Array.isArray(response.data?.history) ? response.data.history : [];
         setBenchmarkHistory(historyData);
         setBenchmarkError("");
       } catch (err) {
@@ -630,6 +727,15 @@ function Dashboard() {
         console.error("Geographic exposure unavailable:", err);
         setGeographicExposure(null);
         setGeographicError(getErrorMessage(err, "Geographic exposure is currently unavailable."));
+      }
+
+      /* COMPANY NAMES */
+      try {
+        const response = await api.get(`/portfolios/${selectedPortfolioId}/companies`, config);
+        setCompanies(response.data?.companies || {});
+      } catch (err) {
+        console.error("Company names unavailable:", err);
+        setCompanies({});
       }
 
       setLoadingDashboard(false);
@@ -1104,6 +1210,7 @@ function Dashboard() {
     setDailySummary(null);
     setGeographicExposure(null);
     setGeographicError("");
+    setCompanies({});
   };
 
 
@@ -1528,6 +1635,7 @@ function Dashboard() {
             dailySummary,
             geographicExposure,
             geographicError,
+            companies,
             simulationTicker,
             setSimulationTicker,
             simulationQuantity,
@@ -1613,7 +1721,7 @@ function Dashboard() {
 }
 
 function OverviewPage() {
-  const { valuation, selectedPortfolio, portfolios, selectedPortfolioId, handlePortfolioChange, setShowAddHolding, handleDeleteHolding, analytics, interpretation, recommendations, benchmarkHistory, benchmarkError, dailySummary } = useOutletContext();
+  const { valuation, selectedPortfolio, portfolios, selectedPortfolioId, handlePortfolioChange, setShowAddHolding, setShowCreatePortfolio, handleDeleteHolding, analytics, interpretation, recommendations, benchmarkHistory, benchmarkError, dailySummary } = useOutletContext();
   const performance = analytics?.performance || {};
   const risk = analytics?.risk || {};
   const diversification = analytics?.diversification || {};
@@ -1641,6 +1749,7 @@ function OverviewPage() {
             {portfolios.map((portfolio) => <option key={portfolio.portfolio_id ?? portfolio.id} value={portfolio.portfolio_id ?? portfolio.id}>{portfolio.name ?? portfolio.portfolio_name ?? `Portfolio ${portfolio.portfolio_id ?? portfolio.id}`}</option>)}
           </select>
           <button className="secondary-button" onClick={() => setShowAddHolding(true)}>+ Add Holding</button>
+          <button className="primary-button" onClick={() => setShowCreatePortfolio(true)}>+ Add Portfolio</button>
         </div>
       </div>
 
@@ -1881,7 +1990,7 @@ function AnalyticsPage() {
 }
 
 function PerformancePage() {
-  const { analytics, valuation, benchmarkHistory, benchmarkError } = useOutletContext();
+  const { analytics, valuation, benchmarkHistory, benchmarkError, companies } = useOutletContext();
   const performance = analytics?.performance || {};
   const holdings = valuation?.holdings || [];
   const totalValue = Number(valuation?.current_value || 0);
@@ -1898,7 +2007,7 @@ function PerformancePage() {
     const contribution = (weight * individualReturn) / 100;
     return {
       ticker: h.ticker,
-      company: TICKER_NAMES[h.ticker] || h.ticker,
+      company: companies?.[h.ticker] || TICKER_NAMES[h.ticker] || h.ticker,
       weight,
       individualReturn,
       contribution,
@@ -2199,11 +2308,18 @@ function SimulatorPage() {
    APP ROUTER
 ========================================================= */
 
+/* =========================================================
+   APP ROUTER
+========================================================= */
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        
+        {/* ADD THE SIGNUP ROUTE HERE */}
+        <Route path="/signup" element={<Signup />} />
         
         {/* The Parent Dashboard Layout */}
         <Route path="/dashboard" element={<Dashboard />}>
@@ -2223,6 +2339,5 @@ function App() {
     </BrowserRouter>
   );
 }
-
 
 export default App;
