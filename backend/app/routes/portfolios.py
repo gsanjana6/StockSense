@@ -2,15 +2,25 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.services.portfolio_service import calculate_portfolio_value
 from app.services.exposure_service import calculate_sector_exposure
-from app.services.geographic_exposure_service import calculate_geographic_exposure
 from app.database.session import get_db
 from app.models.portfolio import Portfolio
+from app.models.holding import Holding
 from app.models.user import User
 
 from app.services.snapshot_service import (
     create_portfolio_snapshot,
     get_portfolio_snapshot_history
 )
+
+from app.services.benchmark_service import (
+    get_portfolio_benchmark_history
+)
+
+from app.services.geography_service import (
+    calculate_geographic_exposure
+)
+
+from app.services.company_service import get_or_create_company
 
 from app.schemas.simulation import WhatIfRequest
 from app.services.simulation_service import (
@@ -339,7 +349,7 @@ def get_portfolio_exposure(
     }
 
 @router.get("/{portfolio_id}/geographic-exposure")
-def get_portfolio_geographic_exposure(
+def get_geographic_exposure(
     portfolio_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -355,24 +365,58 @@ def get_portfolio_geographic_exposure(
             detail="Portfolio not found"
         )
 
-    exposure = calculate_geographic_exposure(portfolio_id, db)
+    geography = calculate_geographic_exposure(
+        portfolio_id,
+        db
+    )
 
-    if exposure is None:
+    if geography is None:
         raise HTTPException(
             status_code=400,
-            detail="Insufficient data for geographic exposure analysis"
+            detail="Insufficient data for geographic exposure"
+        )
+
+    return geography
+
+@router.get("/{portfolio_id}/companies")
+def get_portfolio_companies(
+    portfolio_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    portfolio = db.query(Portfolio).filter(
+        Portfolio.portfolio_id == portfolio_id,
+        Portfolio.user_id == current_user.user_id
+    ).first()
+
+    if not portfolio:
+        raise HTTPException(
+            status_code=404,
+            detail="Portfolio not found"
+        )
+
+    holdings = db.query(Holding).filter(
+        Holding.portfolio_id == portfolio_id
+    ).all()
+
+    companies = {}
+
+    for holding in holdings:
+        company = get_or_create_company(
+            holding.ticker,
+            db
+        )
+
+        companies[holding.ticker] = (
+            company.company_name
+            if company and company.company_name
+            else holding.ticker
         )
 
     return {
         "portfolio_id": portfolio_id,
-        "exposure": exposure["exposure"],
-        "largest_country": exposure["largest_country"],
-        "largest_country_weight": exposure["largest_country_weight"],
-        "country_count": exposure["country_count"],
-        "total_value": exposure["total_value"],
-        "holdings": exposure["holdings"],
+        "companies": companies
     }
-
 
 @router.get("/{portfolio_id}/performance")
 def get_portfolio_performance(
@@ -405,6 +449,33 @@ def get_portfolio_performance(
     return {
         "portfolio_id": portfolio_id,
         "performance": performance
+    }
+
+@router.get("/{portfolio_id}/benchmark-history")
+def get_benchmark_history(
+    portfolio_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    portfolio = db.query(Portfolio).filter(
+        Portfolio.portfolio_id == portfolio_id,
+        Portfolio.user_id == current_user.user_id
+    ).first()
+
+    if not portfolio:
+        raise HTTPException(
+            status_code=404,
+            detail="Portfolio not found"
+        )
+
+    history = get_portfolio_benchmark_history(
+        portfolio_id,
+        db
+    )
+
+    return {
+        "portfolio_id": portfolio_id,
+        "history": history
     }
 
 @router.post("/{portfolio_id}/simulate")
