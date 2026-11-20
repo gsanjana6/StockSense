@@ -6,6 +6,7 @@ from app.routes.portfolios import router as portfolio_router
 from app.routes.holdings import router as holdings_router
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from app.routes import technical_analysis
 
 from app.services.scheduler_service import (
     start_scheduler,
@@ -26,6 +27,8 @@ app = FastAPI(
     title="StockSense API",
     lifespan=lifespan
 )
+
+app.include_router(technical_analysis.router)
 
 app.add_middleware(
     CORSMiddleware,
