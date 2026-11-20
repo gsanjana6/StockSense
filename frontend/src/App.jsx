@@ -65,7 +65,7 @@ const TICKER_NAMES = {
 
 import api from "./api";
 import Sidebar from "./Sidebar";
-
+import TechnicalAnalysis from "./components/TechnicalAnalysis";
 
 /* =========================================================
    ERROR HELPER
@@ -1809,10 +1809,19 @@ function AnalyticsPage() {
   const largestSectorWeight = Number(exposureData.largest_sector_weight || 0);
 
   const holdings = valuation?.holdings || [];
-  const returnAttributionData = holdings.map((h) => ({
-    ticker: h.ticker,
-    return: Number(h.gain_loss_percentage || 0),
-  }));
+  const totalValue = Number(valuation?.current_value || 0);
+  
+  const returnAttributionData = holdings.map((h) => {
+    // Calculate the actual weight of the stock in the portfolio
+    const weight = totalValue > 0 ? (Number(h.current_value || 0) / totalValue) : 0;
+    const individualReturn = Number(h.gain_loss_percentage || 0);
+    
+    return {
+      ticker: h.ticker,
+      // Attribution = Weight * Individual Return
+      return: weight * individualReturn,
+    };
+  });
 
   return (
     <div className="feature-page">
@@ -2332,9 +2341,11 @@ function App() {
           <Route path="performance" element={<PerformancePage />} />
           <Route path="insights" element={<InsightsPage />} />
           <Route path="simulator" element={<SimulatorPage />} />
+                  <Route path="technical-analysis" element={<TechnicalAnalysis />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/login" replace />} />
+
       </Routes>
     </BrowserRouter>
   );
