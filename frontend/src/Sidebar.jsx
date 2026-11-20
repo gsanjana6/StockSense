@@ -10,6 +10,7 @@ function Sidebar() {
     { label: "Performance", path: "/dashboard/performance", icon: "↗" },
     { label: "Insights", path: "/dashboard/insights", icon: "✦" },
     { label: "What-If Simulator", path: "/dashboard/simulator", icon: "◇" },
+    { label: "Technical Analysis", path: "/dashboard/technical-analysis", icon: "⌁" },
   ];
 
   const logout = () => {
