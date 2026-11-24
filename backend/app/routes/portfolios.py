@@ -6,6 +6,8 @@ from app.database.session import get_db
 from app.models.portfolio import Portfolio
 from app.models.holding import Holding
 from app.models.user import User
+from app.schemas.advanced_simulation import AdvancedWhatIfRequest
+from app.services.advanced_simulation_service import run_advanced_simulation
 
 from app.services.snapshot_service import (
     create_portfolio_snapshot,
@@ -512,6 +514,45 @@ def simulate_portfolio_changes(
         raise HTTPException(
             status_code=400,
             detail=result["error"]
+        )
+
+    return {
+        "portfolio_id": portfolio_id,
+        "simulation": result
+    }
+
+@router.post("/{portfolio_id}/simulate/advanced")
+def advanced_simulate_portfolio(
+    portfolio_id: int,
+    request: AdvancedWhatIfRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    portfolio = db.query(Portfolio).filter(
+        Portfolio.portfolio_id == portfolio_id,
+        Portfolio.user_id == current_user.user_id
+    ).first()
+
+    if not portfolio:
+        raise HTTPException(
+            status_code=404,
+            detail="Portfolio not found"
+        )
+
+    result = run_advanced_simulation(
+        portfolio_id,
+        request,
+        db
+    )
+
+    if result is None or "error" in result:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                result["error"]
+                if result and "error" in result
+                else "Unable to run advanced simulation"
+            )
         )
 
     return {
