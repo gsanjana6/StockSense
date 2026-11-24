@@ -8,6 +8,7 @@ import {
   YAxis,
   Tooltip,
   Bar,
+  Cell,
 } from "recharts";
 
 function Simulator() {
@@ -19,14 +20,53 @@ function Simulator() {
   } = useOutletContext();
 
   const [changes, setChanges] = useState([
-    { ticker: "", action: "add", amount: "" },
+    {
+      ticker: "",
+      action: "add",
+      amount: "",
+      amount_type: "dollars",
+    },
   ]);
+
   const [period, setPeriod] = useState("1y");
 
   const simulation = simulationResult?.simulation;
   const current = simulation?.current;
   const simulated = simulation?.simulated;
   const comparison = simulation?.comparison;
+
+  const tickerColors = [
+    "#4169E1",
+    "#16A085",
+    "#E09F3E",
+    "#9B59B6",
+    "#E05D6F",
+    "#2697B8",
+  ];
+
+  const getTickerColor = (ticker) => {
+    const tickers = Object.keys(simulated?.correlation_matrix || {});
+    const index = tickers.indexOf(ticker);
+
+    return tickerColors[
+      (index >= 0 ? index : 0) % tickerColors.length
+    ];
+  };
+
+  const formatDateOnly = (date) => {
+    if (!date) return "--";
+
+    const parsed = new Date(date);
+
+    if (Number.isNaN(parsed.getTime())) return date;
+
+    return parsed.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  };
 
   const updateChange = (index, field, value) => {
     setChanges((previous) =>
@@ -39,7 +79,12 @@ function Simulator() {
   const addChange = () => {
     setChanges((previous) => [
       ...previous,
-      { ticker: "", action: "add", amount: "" },
+      {
+        ticker: "",
+        action: "add",
+        amount: "",
+        amount_type: "dollars",
+      },
     ]);
   };
 
@@ -55,6 +100,7 @@ function Simulator() {
     const validChanges = changes.map((change) => ({
       ticker: change.ticker.trim().toUpperCase(),
       action: change.action,
+      amount_type: change.amount_type,
       ...(change.action !== "remove"
         ? { amount: Number(change.amount) }
         : {}),
@@ -65,7 +111,8 @@ function Simulator() {
         (change) =>
           !change.ticker ||
           (change.action !== "remove" &&
-            (!Number.isFinite(change.amount) || change.amount <= 0))
+            (!Number.isFinite(change.amount) ||
+              change.amount <= 0))
       )
     ) {
       return;
@@ -89,121 +136,201 @@ function Simulator() {
     ["Effective Holdings", "effective_holdings", ""],
   ];
 
-  const formatMetric = (value, suffix = "") =>
-    Number.isFinite(Number(value))
-      ? `${suffix === "$" ? "$" : ""}${Number(value).toFixed(2)}${suffix === "%" ? "%" : ""}`
-      : "--";
+  const formatMetric = (value, suffix = "") => {
+    if (!Number.isFinite(Number(value))) return "--";
+
+    const formatted = Number(value).toFixed(2);
+
+    if (suffix === "$") return `$${formatted}`;
+    if (suffix === "%") return `${formatted}%`;
+
+    return formatted;
+  };
 
   const riskContributionData = simulated?.risk_contributions
-    ? Object.entries(simulated.risk_contributions).map(([ticker, data]) => ({
-        ticker,
-        risk: Number(data.percentage_risk_contribution ?? 0),
-      }))
+    ? Object.entries(simulated.risk_contributions).map(
+        ([ticker, data]) => ({
+          ticker,
+          risk: Number(
+            data.percentage_risk_contribution ?? 0
+          ),
+        })
+      )
     : [];
 
   const scatterData = simulated?.risk_return_scatter || [];
 
   return (
-    <div className="feature-page">
+    <div className="feature-page simulator-page">
+      {/* PAGE INTRODUCTION */}
+
       <div className="feature-hero">
-        <div className="feature-eyebrow">ADVANCED WHAT-IF SIMULATOR</div>
+        <div className="feature-eyebrow">
+          ADVANCED WHAT-IF SIMULATOR
+        </div>
+
         <h1>
           Test a different strategy.
           <br />
-          <span>Understand its risk before making a move.</span>
+          <span>
+            Understand its risk before making a move.
+          </span>
         </h1>
+
+        <p>
+          Explore hypothetical investment changes and see how
+          they could affect your portfolio's risk and performance.
+        </p>
       </div>
 
-      <div className="welcome-card" style={{ marginTop: "24px" }}>
-        <h2>Build Your Scenario</h2>
-        <p style={{ marginBottom: "20px" }}>
-          Add, reduce, or remove holdings using investment amounts.
-          These changes are hypothetical and do not modify your actual portfolio.
-        </p>
+      {/* SCENARIO BUILDER */}
+
+      <div className="welcome-card simulator-builder">
+        <div className="simulator-section-heading">
+          <div>
+            <span className="simulator-step">
+              SCENARIO BUILDER
+            </span>
+
+            <h2>Build Your Scenario</h2>
+
+            <p>
+              Add, reduce, or remove holdings using either
+              investment amounts or share quantities.
+              These changes will not modify your actual portfolio.
+            </p>
+          </div>
+        </div>
 
         <form onSubmit={submitSimulation}>
-          {changes.map((change, index) => (
-            <div
-              key={index}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                gap: "12px",
-                marginBottom: "14px",
-                alignItems: "center",
-              }}
-            >
-              <input
-                type="text"
-                placeholder="Ticker e.g. NVDA"
-                value={change.ticker}
-                onChange={(e) =>
-                  updateChange(index, "ticker", e.target.value.toUpperCase())
-                }
-                required
-              />
-
-              <select
-                value={change.action}
-                onChange={(e) =>
-                  updateChange(index, "action", e.target.value)
-                }
+          <div className="simulator-change-list">
+            {changes.map((change, index) => (
+              <div
+                className="simulator-change-row"
+                key={index}
               >
-                <option value="add">Add investment</option>
-                <option value="reduce">Reduce investment</option>
-                <option value="remove">Remove holding</option>
-              </select>
+                <div className="simulator-field">
+                  <label>Stock ticker</label>
 
-              {change.action !== "remove" && (
-                <input
-                  type="number"
-                  min="0.01"
-                  step="any"
-                  placeholder="Amount ($)"
-                  value={change.amount}
-                  onChange={(e) =>
-                    updateChange(index, "amount", e.target.value)
-                  }
-                  required
-                />
-              )}
+                  <input
+                    type="text"
+                    placeholder="e.g. MSFT"
+                    value={change.ticker}
+                    onChange={(e) =>
+                      updateChange(
+                        index,
+                        "ticker",
+                        e.target.value.toUpperCase()
+                      )
+                    }
+                    required
+                  />
+                </div>
 
-              {changes.length > 1 && (
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => removeChange(index)}
-                >
-                  Remove row
-                </button>
-              )}
-            </div>
-          ))}
+                <div className="simulator-field">
+                  <label>Action</label>
+
+                  <select
+                    value={change.action}
+                    onChange={(e) =>
+                      updateChange(
+                        index,
+                        "action",
+                        e.target.value
+                      )
+                    }
+                  >
+                    <option value="add">Add investment</option>
+                    <option value="reduce">Reduce holding</option>
+                    <option value="remove">Remove holding</option>
+                  </select>
+                </div>
+
+                {change.action !== "remove" && (
+                  <>
+                    <div className="simulator-field">
+                      <label>Input type</label>
+
+                      <select
+                        value={change.amount_type}
+                        onChange={(e) =>
+                          updateChange(
+                            index,
+                            "amount_type",
+                            e.target.value
+                          )
+                        }
+                      >
+                        <option value="dollars">
+                          Investment amount ($)
+                        </option>
+
+                        <option value="shares">
+                          Number of shares
+                        </option>
+                      </select>
+                    </div>
+
+                    <div className="simulator-field">
+                      <label>
+                        {change.amount_type === "shares"
+                          ? "Share quantity"
+                          : "Investment amount"}
+                      </label>
+
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        placeholder={
+                          change.amount_type === "shares"
+                            ? "e.g. 5 shares"
+                            : "e.g. 1000"
+                        }
+                        value={change.amount}
+                        onChange={(e) =>
+                          updateChange(
+                            index,
+                            "amount",
+                            e.target.value
+                          )
+                        }
+                        required
+                      />
+                    </div>
+                  </>
+                )}
+
+                {changes.length > 1 && (
+                  <button
+                    type="button"
+                    className="simulator-remove-row"
+                    onClick={() => removeChange(index)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
 
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button simulator-add-button"
             onClick={addChange}
-            style={{ marginBottom: "20px" }}
           >
             + Add another change
           </button>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "14px",
-              marginBottom: "20px",
-            }}
-          >
-            <div>
-              <label>Benchmark</label>
-              <p><strong>S&P 500 (SPY)</strong></p>
+          <div className="simulator-settings">
+            <div className="simulator-benchmark">
+              <span>BENCHMARK</span>
+              <strong>S&P 500 (SPY)</strong>
             </div>
 
-            <div>
-              <label>Analysis Period</label>
+            <div className="simulator-field simulator-period">
+              <label>Analysis period</label>
+
               <select
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
@@ -215,26 +342,38 @@ function Simulator() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="primary-button"
-            disabled={simulationLoading}
-          >
-            {simulationLoading ? "Running simulation..." : "Run Advanced Simulation"}
-          </button>
+          <div className="simulator-submit-area">
+            <button
+              type="submit"
+              className="primary-button simulator-run-button"
+              disabled={simulationLoading}
+            >
+              {simulationLoading
+                ? "Running simulation..."
+                : "Run Advanced Simulation →"}
+            </button>
+          </div>
         </form>
 
         {simulationError && (
-          <div className="error-message" style={{ marginTop: "15px" }}>
+          <div
+            className="error-message"
+            style={{ marginTop: "15px" }}
+          >
             {simulationError}
           </div>
         )}
       </div>
 
+      {/* SIMULATION RESULTS */}
+
       {simulation && current && simulated && (
         <>
-          <div className="welcome-card" style={{ marginTop: "24px" }}>
+          {/* CURRENT VS SIMULATED */}
+
+          <div className="welcome-card">
             <h2>Current vs Simulated Portfolio</h2>
+
             <div style={{ overflowX: "auto", marginTop: "16px" }}>
               <table className="ss-holdings-table">
                 <thead>
@@ -245,18 +384,31 @@ function Simulator() {
                     <th>Change</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {comparisonRows.map(([label, key, suffix]) => {
                     const before = Number(current[key] ?? 0);
                     const after = Number(simulated[key] ?? 0);
+                    const difference = after - before;
 
                     return (
                       <tr key={key}>
-                        <td><strong>{label}</strong></td>
+                        <td>
+                          <strong>{label}</strong>
+                        </td>
+
                         <td>{formatMetric(before, suffix)}</td>
+
                         <td>{formatMetric(after, suffix)}</td>
-                        <td className={after >= before ? "ss-positive" : "ss-negative"}>
-                          {formatMetric(after - before, suffix)}
+
+                        <td
+                          className={
+                            difference >= 0
+                              ? "ss-positive"
+                              : "ss-negative"
+                          }
+                        >
+                          {formatMetric(difference, suffix)}
                         </td>
                       </tr>
                     );
@@ -266,68 +418,121 @@ function Simulator() {
             </div>
           </div>
 
-          <div className="feature-grid" style={{ marginTop: "24px" }}>
+          {/* KPI CARDS */}
+
+          <div
+            className="feature-grid"
+            style={{ marginTop: "24px" }}
+          >
             <div className="feature-card">
               <h3>Investment Value Change</h3>
-              <h2 style={{ marginTop: "10px" }}>
-                ${Number(comparison?.investment_value_change ?? 0).toFixed(2)}
+              <h2>
+                $
+                {Number(
+                  comparison?.investment_value_change ?? 0
+                ).toFixed(2)}
               </h2>
             </div>
+
             <div className="feature-card">
               <h3>Return Change</h3>
-              <h2 style={{ marginTop: "10px" }}>
-                {Number(comparison?.return_change ?? 0).toFixed(2)}%
+              <h2>
+                {Number(
+                  comparison?.return_change ?? 0
+                ).toFixed(2)}
+                %
               </h2>
             </div>
+
             <div className="feature-card">
               <h3>Volatility Change</h3>
-              <h2 style={{ marginTop: "10px" }}>
-                {Number(comparison?.volatility_change ?? 0).toFixed(2)}%
+              <h2>
+                {Number(
+                  comparison?.volatility_change ?? 0
+                ).toFixed(2)}
+                %
               </h2>
             </div>
+
             <div className="feature-card">
               <h3>Sharpe Change</h3>
-              <h2 style={{ marginTop: "10px" }}>
-                {Number(comparison?.sharpe_change ?? 0).toFixed(2)}
+              <h2>
+                {Number(
+                  comparison?.sharpe_change ?? 0
+                ).toFixed(2)}
               </h2>
             </div>
           </div>
 
-          <div className="ss-two-col" style={{ marginTop: "24px" }}>
+          {/* ALLOCATION AND DRAWDOWN */}
+
+          <div
+            className="ss-two-col"
+            style={{ marginTop: "24px" }}
+          >
             <div className="welcome-card">
               <h2>Portfolio Allocation</h2>
-              {Object.entries(simulated.weights || {}).map(([ticker, weight]) => (
-                <div key={ticker} className="ss-risk-row">
-                  <span>{ticker}</span>
-                  <strong>{Number(weight).toFixed(2)}%</strong>
-                </div>
-              ))}
+
+              {Object.entries(simulated.weights || {}).map(
+                ([ticker, weight]) => (
+                  <div
+                    key={ticker}
+                    className="ss-risk-row"
+                  >
+                    <span>{ticker}</span>
+                    <strong>
+                      {Number(weight).toFixed(2)}%
+                    </strong>
+                  </div>
+                )
+              )}
             </div>
 
             <div className="welcome-card">
               <h2>Drawdown &amp; Recovery</h2>
+
               <div className="ss-risk-list">
                 <div className="ss-risk-row">
                   <span>Maximum Drawdown</span>
-                  <strong>{Number(simulated.drawdown_recovery?.max_drawdown ?? 0).toFixed(2)}%</strong>
+                  <strong>
+                    {Number(
+                      simulated.drawdown_recovery?.max_drawdown ?? 0
+                    ).toFixed(2)}%
+                  </strong>
                 </div>
+
                 <div className="ss-risk-row">
                   <span>Peak Date</span>
-                  <strong>{simulated.drawdown_recovery?.peak_date || "--"}</strong>
+                  <strong>
+                    {formatDateOnly(
+                      simulated.drawdown_recovery?.peak_date
+                    )}
+                  </strong>
                 </div>
+
                 <div className="ss-risk-row">
                   <span>Trough Date</span>
-                  <strong>{simulated.drawdown_recovery?.trough_date || "--"}</strong>
+                  <strong>
+                    {formatDateOnly(
+                      simulated.drawdown_recovery?.trough_date
+                    )}
+                  </strong>
                 </div>
+
                 <div className="ss-risk-row">
                   <span>Recovery Date</span>
-                  <strong>{simulated.drawdown_recovery?.recovery_date || "Not recovered"}</strong>
+                  <strong>
+                    {formatDateOnly(
+                      simulated.drawdown_recovery?.recovery_date
+                    )}
+                  </strong>
                 </div>
+
                 <div className="ss-risk-row">
                   <span>Recovery Duration</span>
                   <strong>
                     {simulated.drawdown_recovery?.recovery_days != null
-                      ? `${simulated.drawdown_recovery.recovery_days} days`
+                      ? `${simulated.drawdown_recovery.recovery_days} trading days`
                       : "--"}
                   </strong>
                 </div>
@@ -335,17 +540,51 @@ function Simulator() {
             </div>
           </div>
 
-          <div className="welcome-card" style={{ marginTop: "24px" }}>
+          {/* RISK CONTRIBUTION */}
+
+          <div
+            className="welcome-card"
+            style={{ marginTop: "24px" }}
+          >
             <h2>Risk Contribution by Holding</h2>
+
             {riskContributionData.length > 0 ? (
-              <div style={{ width: "100%", height: "320px", marginTop: "16px" }}>
+              <div
+                style={{
+                  width: "100%",
+                  height: "320px",
+                  marginTop: "16px",
+                }}
+              >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={riskContributionData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                    />
+
                     <XAxis dataKey="ticker" />
+
                     <YAxis unit="%" />
-                    <Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} />
-                    <Bar dataKey="risk" name="Risk Contribution" fill="var(--ss-primary)" radius={[6, 6, 0, 0]} />
+
+                    <Tooltip
+                      formatter={(value) =>
+                        `${Number(value).toFixed(2)}%`
+                      }
+                    />
+
+                    <Bar
+                      dataKey="risk"
+                      name="Risk Contribution"
+                      radius={[7, 7, 0, 0]}
+                    >
+                      {riskContributionData.map((entry) => (
+                        <Cell
+                          key={entry.ticker}
+                          fill={getTickerColor(entry.ticker)}
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -363,13 +602,31 @@ function Simulator() {
                     <th>% Risk Contribution</th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  {Object.entries(simulated.risk_contributions || {}).map(([ticker, data]) => (
+                  {Object.entries(
+                    simulated.risk_contributions || {}
+                  ).map(([ticker, data]) => (
                     <tr key={ticker}>
-                      <td><strong>{ticker}</strong></td>
-                      <td>{Number(data.marginal_contribution_to_risk).toFixed(4)}</td>
-                      <td>{Number(data.component_risk).toFixed(4)}</td>
-                      <td>{Number(data.percentage_risk_contribution).toFixed(2)}%</td>
+                      <td>
+                        <strong>{ticker}</strong>
+                      </td>
+
+                      <td>
+                        {Number(
+                          data.marginal_contribution_to_risk
+                        ).toFixed(4)}
+                      </td>
+
+                      <td>
+                        {Number(data.component_risk).toFixed(4)}
+                      </td>
+
+                      <td>
+                        {Number(
+                          data.percentage_risk_contribution
+                        ).toFixed(2)}%
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -377,8 +634,14 @@ function Simulator() {
             </div>
           </div>
 
-          <div className="welcome-card" style={{ marginTop: "24px" }}>
+          {/* RISK-RETURN ANALYSIS */}
+
+          <div
+            className="welcome-card"
+            style={{ marginTop: "24px" }}
+          >
             <h2>Risk-Return Analysis</h2>
+
             <div style={{ overflowX: "auto", marginTop: "16px" }}>
               <table className="ss-holdings-table">
                 <thead>
@@ -389,13 +652,25 @@ function Simulator() {
                     <th>Portfolio Weight</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {scatterData.map((item) => (
                     <tr key={item.ticker}>
-                      <td><strong>{item.ticker}</strong></td>
-                      <td>{Number(item.annualized_return).toFixed(2)}%</td>
-                      <td>{Number(item.annualized_volatility).toFixed(2)}%</td>
-                      <td>{Number(item.weight).toFixed(2)}%</td>
+                      <td>
+                        <strong>{item.ticker}</strong>
+                      </td>
+
+                      <td>
+                        {Number(item.annualized_return).toFixed(2)}%
+                      </td>
+
+                      <td>
+                        {Number(item.annualized_volatility).toFixed(2)}%
+                      </td>
+
+                      <td>
+                        {Number(item.weight).toFixed(2)}%
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -403,28 +678,79 @@ function Simulator() {
             </div>
           </div>
 
-          <div className="welcome-card" style={{ marginTop: "24px" }}>
+          {/* CORRELATION MATRIX */}
+
+          <div
+            className="welcome-card"
+            style={{ marginTop: "24px" }}
+          >
             <h2>Correlation Matrix</h2>
-            {Object.keys(simulated.correlation_matrix || {}).length > 0 ? (
-              <div style={{ overflowX: "auto", marginTop: "16px" }}>
+
+            {Object.keys(
+              simulated.correlation_matrix || {}
+            ).length > 0 ? (
+              <div
+                style={{
+                  overflowX: "auto",
+                  marginTop: "20px",
+                }}
+              >
                 <table className="ss-matrix-table">
                   <thead>
                     <tr>
                       <th></th>
-                      {Object.keys(simulated.correlation_matrix).map((ticker) => (
+
+                      {Object.keys(
+                        simulated.correlation_matrix
+                      ).map((ticker) => (
                         <th key={ticker}>{ticker}</th>
                       ))}
                     </tr>
                   </thead>
+
                   <tbody>
-                    {Object.entries(simulated.correlation_matrix).map(([ticker, values]) => (
+                    {Object.entries(
+                      simulated.correlation_matrix
+                    ).map(([ticker, values]) => (
                       <tr key={ticker}>
-                        <td className="ss-matrix-row-label">{ticker}</td>
-                        {Object.keys(simulated.correlation_matrix).map((column) => (
-                          <td key={column}>
-                            {Number(values?.[column] ?? 0).toFixed(3)}
-                          </td>
-                        ))}
+                        <td
+                          className="ss-matrix-row-label"
+                          style={{
+                            backgroundColor: "#eef1ff",
+                            color: "#263b70",
+                            fontWeight: 700,
+                            textAlign: "left",
+                          }}
+                        >
+                          {ticker}
+                        </td>
+
+                        {Object.keys(
+                          simulated.correlation_matrix
+                        ).map((column) => {
+                          const value = Number(
+                            values?.[column] ?? 0
+                          );
+
+                          const isDiagonal = ticker === column;
+
+                          return (
+                            <td
+                              key={column}
+                              style={{
+                                backgroundColor: isDiagonal
+                                  ? "#f8f9fa"
+                                  : "#ffffff",
+                                color: "#172033",
+                                fontWeight: isDiagonal ? 800 : 400,
+                                textAlign: "center",
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              {value.toFixed(2)}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>

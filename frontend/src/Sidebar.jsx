@@ -11,6 +11,7 @@ function Sidebar() {
     { label: "Insights", path: "/dashboard/insights", icon: "✦" },
     { label: "What-If Simulator", path: "/dashboard/simulator", icon: "◇" },
     { label: "Technical Analysis", path: "/dashboard/technical-analysis", icon: "⌁" },
+    { label: "AI Assistant", path: "/dashboard/chatbot", icon: "◎" },
   ];
 
   const logout = () => {

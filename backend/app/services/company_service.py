@@ -67,3 +67,30 @@ def get_or_create_company(ticker: str, db: Session):
     db.refresh(new_company)
 
     return new_company
+
+
+def search_companies_by_name(name: str, limit: int = 10):
+    """Search FMP for companies matching a company name."""
+
+    name = name.strip()
+
+    if not name:
+        return []
+
+    url = "https://financialmodelingprep.com/stable/search-name"
+
+    params = {
+        "query": name,
+        "limit": limit,
+        "apikey": settings.FMP_API_KEY,
+    }
+
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+
+    data = response.json()
+
+    if not isinstance(data, list):
+        return []
+
+    return data

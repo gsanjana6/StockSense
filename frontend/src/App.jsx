@@ -15,7 +15,7 @@ import Performance from "./pages/Performance";
 import Analytics from "./pages/Analytics";
 import Simulator from "./pages/Simulator";
 import Overview from "./pages/Overview";
-
+import Chatbot from "./pages/Chatbot";
 import api from "./api";
 import Sidebar from "./Sidebar";
 import TechnicalAnalysis from "./components/TechnicalAnalysis";
@@ -1000,27 +1000,6 @@ function Dashboard() {
         <Sidebar />
         <div className="dashboard-main">
 
-          <header className="dashboard-header">
-
-            <div>
-
-              <h1>
-                StockSense
-              </h1>
-
-              <p>
-                Portfolio Intelligence Dashboard
-              </p>
-
-            </div>
-
-            <button onClick={logout}>
-              Logout
-            </button>
-
-          </header>
-
-
           <main className="dashboard-content">
 
             <div className="welcome-card">
@@ -1134,26 +1113,6 @@ function Dashboard() {
 
         <div className="dashboard-main">
 
-          <header className="dashboard-header">
-
-            <div>
-
-              <h1>
-                StockSense
-              </h1>
-
-              <p>
-                Portfolio Intelligence Dashboard
-              </p>
-
-            </div>
-
-            <button onClick={logout}>
-              Logout
-            </button>
-
-          </header>
-
           <main className="dashboard-content">
 
             <div className="welcome-card">
@@ -1198,13 +1157,6 @@ function Dashboard() {
       <Sidebar />
       
       <div className="dashboard-main">
-        <header className="dashboard-header">
-          <div>
-            <h1>StockSense</h1>
-            <p>Portfolio Intelligence Dashboard</p>
-          </div>
-          <button onClick={logout}>Logout</button>
-        </header>
 
         <main className="dashboard-content">
           {/* 
@@ -1333,7 +1285,8 @@ function App() {
           <Route path="performance" element={<Performance />} />
           <Route path="insights" element={<Insights />} />
           <Route path="simulator" element={<Simulator />} />
-                  <Route path="technical-analysis" element={<TechnicalAnalysis />} />
+          <Route path="technical-analysis" element={<TechnicalAnalysis />} />
+          <Route path="chatbot" element={<Chatbot />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/login" replace />} />

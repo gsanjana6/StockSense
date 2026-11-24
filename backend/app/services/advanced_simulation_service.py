@@ -38,9 +38,7 @@ def calculate_drawdown_recovery(returns):
         peak_candidates == peak_value
     ].index[-1]
 
-    recovery_candidates = growth.loc[
-        trough_date:
-    ]
+    recovery_candidates = growth.loc[trough_date:]
 
     recovered = recovery_candidates[
         recovery_candidates >= peak_value
@@ -52,11 +50,14 @@ def calculate_drawdown_recovery(returns):
         else None
     )
 
-    recovery_days = (
-        (recovery_date - trough_date).days
-        if recovery_date is not None
-        else None
-    )
+    # Count observed trading-day intervals, not calendar days.
+    if recovery_date is not None:
+        trough_position = returns.index.get_loc(trough_date)
+        recovery_position = returns.index.get_loc(recovery_date)
+
+        recovery_days = recovery_position - trough_position
+    else:
+        recovery_days = None
 
     return {
         "max_drawdown": round(max_drawdown * 100, 2),
@@ -418,6 +419,9 @@ def run_advanced_simulation(
         ticker = change.ticker.upper()
         action = change.action
         amount = change.amount
+
+        if amount is not None and change.amount_type == "shares":
+            amount = amount * prices[ticker]
 
         existing_value = scenario_values.get(ticker, 0)
 

@@ -6,6 +6,7 @@ class ScenarioChange(BaseModel):
     ticker: str
     action: Literal["add", "reduce", "remove"]
     amount: Optional[float] = Field(default=None, gt=0)
+    amount_type: Literal["dollars", "shares"] = "dollars"
 
 
 class AdvancedWhatIfRequest(BaseModel):
